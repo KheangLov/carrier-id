@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -418,9 +419,7 @@ fun EmptyState(icon: ImageVector, title: String, body: String, action: String? =
 fun CarrierBadge(carrier: Carrier?, size: Dp, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
     val version by CarrierLogos.version
-    val logo = remember(carrier, version) {
-        carrier?.let { CarrierLogos.bitmap(ctx, it)?.asImageBitmap() }
-    }
+    val logo = remember(carrier, version) { carrier?.let { LogoImages.get(ctx, it, version) } }
     if (logo != null) {
         Box(
             modifier.size(size).clip(CircleShape).background(Color.White)
@@ -442,6 +441,17 @@ fun CarrierBadge(carrier: Carrier?, size: Dp, modifier: Modifier = Modifier) {
             Text(carrier?.initial ?: "?", color = Color.White, fontWeight = FontWeight.Bold,
                 fontSize = (size.value * 0.46f).sp)
         }
+    }
+}
+
+/** Decoded logos shared by every badge on screen (decoded once, not per row). */
+private object LogoImages {
+    private val cache = HashMap<Carrier, ImageBitmap?>()
+    private var cachedVersion = -1
+
+    fun get(ctx: android.content.Context, carrier: Carrier, version: Int): ImageBitmap? {
+        if (version != cachedVersion) { cache.clear(); cachedVersion = version }
+        return cache.getOrPut(carrier) { CarrierLogos.bitmap(ctx, carrier)?.asImageBitmap() }
     }
 }
 

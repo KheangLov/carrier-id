@@ -46,6 +46,21 @@ release, get permission or keep the coloured badges.
 | `ui/RecentsScreen.kt` | Call history with each caller's network |
 | `ui/MainActivity.kt` | Tabs, settings checklist, number checker, contacts list, logo picker |
 
+## Release builds & signing
+
+GitHub Actions builds an optimised **release** APK (R8 code + resource shrinking,
+Compose startup profiles). To sign every build with the same key, so new
+versions install over old ones, add two repository secrets under
+*Settings → Secrets and variables → Actions*:
+
+| Secret | Value |
+|--------|-------|
+| `CARRIERID_KEYSTORE_B64` | the keystore file, base64-encoded |
+| `CARRIERID_KEYSTORE_PASSWORD` | its password (key alias `carrierid`) |
+
+Never commit the keystore: this repository is public. Without the secrets the
+build still works but uses a temporary key.
+
 ## Updating prefixes
 
 Edit the table in `CarrierLookup.kt`. The current table follows the TRC

@@ -61,6 +61,7 @@ internal fun ContactsScreen(tick: Int, onRequestPerms: () -> Unit) {
                     (digits.isNotEmpty() && it.number.filter(Char::isDigit).contains(digits)))
         }
     }
+    val counts = remember(all) { all.orEmpty().groupingBy { it.carrier }.eachCount() }
     val groups = remember(shown) {
         shown.groupBy {
             val ch = it.name.trim().firstOrNull()?.uppercaseChar() ?: '#'
@@ -77,7 +78,7 @@ internal fun ContactsScreen(tick: Int, onRequestPerms: () -> Unit) {
             PillRow {
                 OnePill("All", filter == null, { filter = null })
                 Carrier.entries.forEach { carrier ->
-                    val n = all.count { it.carrier == carrier }
+                    val n = counts[carrier] ?: 0
                     if (n > 0) OnePill("${carrier.displayName}  $n", filter == carrier,
                         { filter = if (filter == carrier) null else carrier },
                         leading = { CarrierBadge(carrier, 20.dp) })

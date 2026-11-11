@@ -1,6 +1,7 @@
 package com.carrierid.app.ui
 
 import android.os.Build
+import android.os.PowerManager
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -38,6 +39,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -54,9 +56,9 @@ data class TabItem(val label: String, val icon: ImageVector, val selectedIcon: I
 /** Space screens should leave at the bottom so their last rows can scroll above the floating bar. */
 val LocalBottomBarSpace = compositionLocalOf { 0.dp }
 
-private val BarHeight = 64.dp
-private val BarPad = 5.dp
-private val TabWidth = 92.dp      // each tab's slot; the capsule hugs its tabs
+private val BarHeight = 74.dp     // tall enough for ~11dp above the icon and below the label
+private val BarPad = 6.dp
+private val TabWidth = 96.dp      // each tab's slot; the capsule hugs its tabs
 private val BarBottomGap = 12.dp  // space between the capsule and the gesture bar
 
 /**
@@ -117,7 +119,12 @@ private fun GlassTabBar(
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
-    val canBlur = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val ctx = LocalContext.current
+    // Real-time blur on Android 12+; skipped in Battery Saver to save power (solid frosted look instead)
+    val canBlur = remember {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            ctx.getSystemService(PowerManager::class.java)?.isPowerSaveMode != true
+    }
 
     val barShape = RoundedCornerShape(BarHeight / 2)
     val lensShape = RoundedCornerShape((BarHeight - BarPad * 2) / 2)
@@ -294,9 +301,9 @@ private fun GlassTab(tab: TabItem, active: Boolean, modifier: Modifier, onClick:
             if (active) tab.selectedIcon else tab.icon, contentDescription = tab.label, tint = color,
             modifier = Modifier.size(24.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value },
         )
-        Spacer(Modifier.height(3.dp))
+        Spacer(Modifier.height(5.dp))
         Text(
-            tab.label, color = color, fontSize = 10.5.sp, letterSpacing = 0.1.sp,
+            tab.label, color = color, fontSize = 11.sp, lineHeight = 13.sp, letterSpacing = 0.1.sp,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
         )
     }

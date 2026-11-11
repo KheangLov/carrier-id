@@ -75,6 +75,8 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
                     (digits.isNotEmpty() && it.number.filter(Char::isDigit).contains(digits)))
         }
     }
+    val present = remember(all) { all.orEmpty().mapNotNullTo(HashSet()) { it.carrier } }
+    val timeFormat = remember { android.text.format.DateFormat.getTimeFormat(ctx) }
     val days = remember(shown) { shown.groupBy { dayLabel(it.date) } } // keeps newest-first order
 
     LargeTitleScreen(
@@ -90,7 +92,7 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
                 OnePill("All", !missedOnly && filter == null, { missedOnly = false; filter = null })
                 OnePill("Missed", missedOnly, { missedOnly = !missedOnly })
                 Carrier.entries.forEach { carrier ->
-                    if (all.any { it.carrier == carrier }) {
+                    if (carrier in present) {
                         OnePill(carrier.displayName, filter == carrier,
                             { filter = if (filter == carrier) null else carrier },
                             leading = { CarrierBadge(carrier, 20.dp) })
@@ -153,7 +155,7 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
                         }
                     }
                     Spacer(Modifier.width(10.dp))
-                    Text(timeOf(ctx, call.date), color = c.textSecondary, fontSize = 12.5.sp)
+                    Text(timeFormat.format(Date(call.date)), color = c.textSecondary, fontSize = 12.5.sp)
                 }
             }
         }
@@ -170,14 +172,14 @@ private fun kindIcon(kind: CallKind) = when (kind) {
 
 private fun isToday(t: Long) = DateUtils.isToday(t)
 
+private val dayFormat = SimpleDateFormat("EEEE, d MMMM", Locale.getDefault())
+private val dayYearFormat = SimpleDateFormat("d MMMM yyyy", Locale.getDefault())
+
 private fun dayLabel(t: Long): String {
     if (DateUtils.isToday(t)) return "Today"
     if (DateUtils.isToday(t + DateUtils.DAY_IN_MILLIS)) return "Yesterday"
-    val thisYear = Calendar.getInstance().get(Calendar.YEAR)
-    val year = Calendar.getInstance().apply { timeInMillis = t }.get(Calendar.YEAR)
-    val pattern = if (year == thisYear) "EEEE, d MMMM" else "d MMMM yyyy"
-    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(t))
+    val now = Calendar.getInstance()
+    val then = Calendar.getInstance().apply { timeInMillis = t }
+    val fmt = if (now.get(Calendar.YEAR) == then.get(Calendar.YEAR)) dayFormat else dayYearFormat
+    return fmt.format(Date(t))
 }
-
-private fun timeOf(ctx: android.content.Context, t: Long): String =
-    android.text.format.DateFormat.getTimeFormat(ctx).format(Date(t))
