@@ -269,7 +269,8 @@ private fun SettingsScreen(
                             Text(carrier?.displayName ?: "Unknown network", color = c.text,
                                 fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                             Text(
-                                if (carrier != null) "Cambodia · mobile" else "Not a Cambodian mobile number",
+                                if (carrier != null) "${PhoneFormat.display(input)}  ·  Cambodia mobile"
+                                else "Not a Cambodian mobile number",
                                 color = c.textSecondary, fontSize = 13.sp,
                             )
                         }
@@ -431,7 +432,7 @@ private fun ContactsScreen(tick: Int, onRequestPerms: () -> Unit) {
                         Text(item.name, color = c.text, fontSize = 16.sp,
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(item.number, color = c.textSecondary, fontSize = 13.sp)
+                            Text(PhoneFormat.display(item.number), color = c.textSecondary, fontSize = 13.sp)
                             item.carrier?.let {
                                 Text("  ·  ", color = c.textSecondary, fontSize = 13.sp)
                                 Text(it.displayName, color = Color(it.colorInt), fontSize = 13.sp,

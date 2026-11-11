@@ -39,4 +39,13 @@ class CarrierLookupTest {
         assertEquals("012345678", CarrierLookup.normalize("+855 12 345 678"))
         assertEquals("0882345678", CarrierLookup.normalize("(088) 234-5678"))
     }
+
+    @Test fun formatsLocal() {
+        assertEquals("012 345 678", CarrierLookup.formatLocal("+85512345678"))
+        assertEquals("088 234 5678", CarrierLookup.formatLocal("0882345678"))
+        assertEquals("097 234 5678", CarrierLookup.formatLocal("00855 97-234-5678"))
+        assertEquals("010 234 567", CarrierLookup.formatLocal("10234567"))
+        assertNull(CarrierLookup.formatLocal("+66812345678"))
+        assertNull(CarrierLookup.formatLocal("1280"))
+    }
 }

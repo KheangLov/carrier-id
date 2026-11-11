@@ -57,4 +57,15 @@ object CarrierLookup {
     }
 
     fun lookup(raw: String?): Carrier? = normalize(raw)?.let { prefixes[it.take(3)] }
+
+    /**
+     * Cambodian numbers in the usual local style, or null if [raw] isn't one:
+     *   "+85512345678"  -> "012 345 678"
+     *   "0882345678"    -> "088 234 5678"
+     */
+    fun formatLocal(raw: String?): String? {
+        val n = normalize(raw) ?: return null
+        // 0XX XXX XXX (9 digits) or 0XX XXX XXXX (10 digits)
+        return "${n.substring(0, 3)} ${n.substring(3, 6)} ${n.substring(6)}"
+    }
 }

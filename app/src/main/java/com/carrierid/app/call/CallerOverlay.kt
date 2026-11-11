@@ -28,6 +28,7 @@ import androidx.core.content.ContextCompat
 import com.carrierid.app.carrier.Carrier
 import com.carrierid.app.carrier.CarrierLogos
 import com.carrierid.app.carrier.CarrierLookup
+import com.carrierid.app.ui.PhoneFormat
 
 /**
  * The floating card shown over the incoming-call screen:
@@ -214,10 +215,13 @@ object CallerOverlay {
             text = carrier?.displayName ?: "Unknown network"
             setTextColor(textColor)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            // Medium weight of the phone's own font (follows Samsung Font style)
+            typeface = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                Typeface.create(Typeface.DEFAULT, 500, false)
+            } else Typeface.DEFAULT_BOLD
         })
         texts.addView(TextView(ctx).apply {
-            text = number
+            text = PhoneFormat.display(number)
             setTextColor(secondary)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
         })

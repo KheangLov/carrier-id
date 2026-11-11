@@ -137,7 +137,7 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
                     Spacer(Modifier.width(14.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            call.name ?: call.number.ifBlank { "Private number" },
+                            call.name ?: PhoneFormat.display(call.number).ifBlank { "Private number" },
                             color = if (call.kind == CallKind.MISSED) MissedRed else c.text,
                             fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
@@ -155,7 +155,7 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
                                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                             )
                             if (call.name != null) {
-                                Text("  ·  ${call.number}", color = c.textSecondary, fontSize = 13.sp,
+                                Text("  ·  ${PhoneFormat.display(call.number)}", color = c.textSecondary, fontSize = 13.sp,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }

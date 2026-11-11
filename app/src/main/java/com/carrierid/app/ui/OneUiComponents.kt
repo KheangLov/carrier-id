@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.sp
 import com.carrierid.app.carrier.Carrier
 import com.carrierid.app.carrier.CarrierLogos
 import com.carrierid.app.ui.theme.One
+import com.carrierid.app.ui.theme.SystemFont
 
 private val CardRadius = 26.dp
 
@@ -227,7 +228,7 @@ fun OneTextField(
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             BasicTextField(
                 value = value, onValueChange = onValueChange, singleLine = true,
-                textStyle = TextStyle(color = c.text, fontSize = 16.sp),
+                textStyle = TextStyle(color = c.text, fontSize = 16.sp, fontFamily = SystemFont),
                 cursorBrush = SolidColor(c.accent),
                 keyboardOptions = keyboardOptions,
                 modifier = Modifier.fillMaxWidth(),
