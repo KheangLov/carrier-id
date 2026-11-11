@@ -54,8 +54,10 @@ data class TabItem(val label: String, val icon: ImageVector, val selectedIcon: I
 /** Space screens should leave at the bottom so their last rows can scroll above the floating bar. */
 val LocalBottomBarSpace = compositionLocalOf { 0.dp }
 
-private val BarHeight = 66.dp
-private val BarPad = 6.dp
+private val BarHeight = 64.dp
+private val BarPad = 5.dp
+private val TabWidth = 92.dp      // each tab's slot; the capsule hugs its tabs
+private val BarBottomGap = 12.dp  // space between the capsule and the gesture bar
 
 /**
  * Screen content with a floating "liquid glass" tab bar on top (inspired by Rien).
@@ -75,7 +77,7 @@ fun GlassScaffold(
     val backdrop = rememberGraphicsLayer()
     var contentOrigin by remember { mutableStateOf(Offset.Zero) }
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val space: Dp = BarHeight + 8.dp + navInset + 20.dp
+    val space: Dp = BarHeight + BarBottomGap + navInset + 12.dp
 
     Box(Modifier.fillMaxSize()) {
         Box(
@@ -97,7 +99,7 @@ fun GlassScaffold(
             onSelect = onSelect,
             modifier = Modifier.align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
+                .padding(start = 20.dp, end = 20.dp, bottom = BarBottomGap),
         )
     }
 }
@@ -163,17 +165,17 @@ private fun GlassTabBar(
 
     Box(
         modifier
-            .widthIn(max = 440.dp)
-            .fillMaxWidth()
+            // Compact floating capsule centred above the gesture bar
+            .width(TabWidth * tabs.size + BarPad * 2)
             .height(BarHeight)
             .onGloballyPositioned {
                 barOrigin = it.positionInRoot()
                 barWidth = it.size.width.toFloat()
             }
             .shadow(
-                elevation = 18.dp, shape = barShape,
-                ambientColor = Color.Black.copy(alpha = 0.10f),
-                spotColor = Color.Black.copy(alpha = if (c.dark) 0.5f else 0.16f),
+                elevation = 22.dp, shape = barShape,
+                ambientColor = Color.Black.copy(alpha = 0.08f),
+                spotColor = Color.Black.copy(alpha = if (c.dark) 0.55f else 0.18f),
             )
             .clip(barShape)
             // Press and drag along the bar to move the lens; lifting opens that tab.
@@ -218,7 +220,7 @@ private fun GlassTabBar(
             Box(
                 Modifier.matchParentSize()
                     .graphicsLayer {
-                        val r = 26.dp.toPx()
+                        val r = 24.dp.toPx()
                         renderEffect = BlurEffect(r, r, TileMode.Clamp)
                         clip = true
                     }
@@ -278,7 +280,7 @@ private fun GlassTab(tab: TabItem, active: Boolean, modifier: Modifier, onClick:
             pop.animateTo(1f, spring(dampingRatio = 0.42f, stiffness = 520f))
         }
     }
-    val color = if (active) c.accent else c.textSecondary
+    val color = if (active) c.accent else c.text.copy(alpha = 0.62f)
     Column(
         modifier.fillMaxHeight().clickable(
             interactionSource = remember { MutableInteractionSource() },
@@ -290,9 +292,12 @@ private fun GlassTab(tab: TabItem, active: Boolean, modifier: Modifier, onClick:
     ) {
         Icon(
             if (active) tab.selectedIcon else tab.icon, contentDescription = tab.label, tint = color,
-            modifier = Modifier.size(25.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value },
+            modifier = Modifier.size(24.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value },
         )
-        Spacer(Modifier.height(2.dp))
-        Text(tab.label, color = color, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(3.dp))
+        Text(
+            tab.label, color = color, fontSize = 10.5.sp, letterSpacing = 0.1.sp,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+        )
     }
 }

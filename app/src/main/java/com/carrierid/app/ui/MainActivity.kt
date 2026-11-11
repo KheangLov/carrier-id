@@ -32,17 +32,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Call
-import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -107,9 +96,9 @@ class MainActivity : ComponentActivity() {
                 GlassScaffold(
                     selected = tab,
                     tabs = listOf(
-                        TabItem("Recents", Icons.Outlined.Call, Icons.Filled.Call),
-                        TabItem("Contacts", Icons.Outlined.Person, Icons.Filled.Person),
-                        TabItem("Settings", Icons.Outlined.Settings, Icons.Filled.Settings),
+                        TabItem("Recents", AppIcons.Recents, AppIcons.RecentsFilled),
+                        TabItem("Contacts", AppIcons.Person, AppIcons.PersonFilled),
+                        TabItem("Settings", AppIcons.Sliders, AppIcons.SlidersFilled),
                     ),
                     onSelect = { tab = it },
                 ) {
@@ -189,261 +178,12 @@ class MainActivity : ComponentActivity() {
 
 // ---------------------------------------------------------------- helpers
 
-private fun Context.has(perm: String) =
+internal fun Context.has(perm: String) =
     ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
 
-private fun Context.holdsScreeningRole() =
+internal fun Context.holdsScreeningRole() =
     getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_CALL_SCREENING)
 
-private fun Context.ignoresBatteryOpt() =
+internal fun Context.ignoresBatteryOpt() =
     getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
 
-private data class SetupItem(
-    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-    val color: Color,
-    val title: String,
-    val offText: String,
-    val done: Boolean,
-    val onClick: () -> Unit,
-)
-
-// ---------------------------------------------------------------- Settings
-
-@Composable
-private fun SettingsScreen(
-    tick: Int,
-    onRequestRole: () -> Unit,
-    onRequestOverlay: () -> Unit,
-    onRequestPerms: () -> Unit,
-    onOpenBattery: () -> Unit,
-    onPickLogo: (Carrier) -> Unit,
-) {
-    val ctx = LocalContext.current
-    val c = One.colors
-    val logoVersion by CarrierLogos.version
-    val items = remember(tick) {
-        listOf(
-            SetupItem(Icons.Filled.Call, Color(0xFF34B36B), "Caller ID app",
-                "Let Carrier ID see incoming numbers", ctx.holdsScreeningRole(), onRequestRole),
-            SetupItem(Icons.Filled.Info, Color(0xFF3E7BFA), "Show over call screen",
-                "Needed to display the network card", Settings.canDrawOverlays(ctx), onRequestOverlay),
-            SetupItem(Icons.Filled.Person, Color(0xFFF59B3A), "Contacts, calls & phone",
-                "Logos in contacts and call history", ctx.has(Manifest.permission.READ_CONTACTS) &&
-                    ctx.has(Manifest.permission.READ_PHONE_STATE) &&
-                    ctx.has(Manifest.permission.READ_CALL_LOG), onRequestPerms),
-            SetupItem(Icons.Filled.Refresh, Color(0xFF8E6CEF), "Keep running",
-                "Stop the phone from putting it to sleep", ctx.ignoresBatteryOpt(), onOpenBattery),
-        )
-    }
-    val doneCount = items.count { it.done }
-    val overlayOk = items[1].done
-
-    LargeTitleScreen(
-        title = "Carrier ID",
-        subtitle = if (doneCount == items.size) "Ready. You'll see the caller's network on every call."
-        else "$doneCount of ${items.size} settings on",
-    ) {
-        item { GroupHeader("Setup") }
-        itemsIndexed(items) { i, it ->
-            GroupCell(i, items.size, onClick = it.onClick) {
-                SettingContent(it.icon, it.color, it.title,
-                    if (it.done) "On" else it.offText, it.done, it.onClick)
-            }
-        }
-
-        item { GroupHeader("Check a number") }
-        item {
-            var input by rememberSaveable { mutableStateOf("") }
-            val carrier = CarrierLookup.lookup(input)
-            OneCard {
-                OneTextField(
-                    value = input, onValueChange = { input = it },
-                    placeholder = "088 234 5678", icon = Icons.Filled.Phone,
-                    background = c.field,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                )
-                if (input.isNotBlank()) {
-                    Spacer(Modifier.height(16.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CarrierBadge(carrier, 44.dp)
-                        Spacer(Modifier.width(14.dp))
-                        Column {
-                            Text(carrier?.displayName ?: "Unknown network", color = c.text,
-                                fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                            Text(
-                                if (carrier != null) "${PhoneFormat.display(input)}  ·  Cambodia mobile"
-                                else "Not a Cambodian mobile number",
-                                color = c.textSecondary, fontSize = 13.sp,
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(16.dp))
-                OneButton("Preview call card", enabled = overlayOk) {
-                    val n = input.ifBlank { "012 345 678" }
-                    CallerOverlay.show(ctx, n, CarrierLookup.lookup(n), preview = true)
-                }
-                if (!overlayOk) {
-                    Spacer(Modifier.height(8.dp))
-                    Text("Turn on \"Show over call screen\" first.", color = c.textSecondary,
-                        fontSize = 12.sp, modifier = Modifier.fillMaxWidth())
-                }
-            }
-        }
-
-        item { GroupHeader("Networks & logos") }
-        item {
-            Text(
-                "Tap a network to choose its logo from your photos. Save each company's " +
-                    "logo image from its website or Facebook page first.",
-                color = c.textSecondary, fontSize = 13.sp,
-                modifier = Modifier.padding(start = 30.dp, end = 30.dp, bottom = 10.dp),
-            )
-        }
-        val carriers = Carrier.entries
-        itemsIndexed(carriers) { i, carrier ->
-            val custom = remember(logoVersion, carrier) { CarrierLogos.hasCustom(ctx, carrier) }
-            GroupCell(i, carriers.size, onClick = { onPickLogo(carrier) }) {
-                CarrierBadge(carrier, 40.dp)
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(carrier.displayName, color = c.text, fontSize = 16.sp)
-                    Text(CarrierLookup.prefixesOf(carrier).joinToString("  "),
-                        color = c.textSecondary, fontSize = 13.sp)
-                }
-                if (custom) {
-                    Text(
-                        "Remove", color = c.textSecondary, fontSize = 13.sp,
-                        modifier = Modifier.clip(RoundedCornerShape(50))
-                            .clickable { CarrierLogos.remove(ctx, carrier) }
-                            .padding(horizontal = 10.dp, vertical = 6.dp),
-                    )
-                } else {
-                    Text("Add logo", color = c.accent, fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-        item {
-            Text(
-                "The network is worked out from the number's prefix. Numbers moved to another " +
-                    "network will still show the original one.",
-                color = c.textSecondary, fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 30.dp, vertical = 16.dp),
-            )
-        }
-    }
-}
-
-// ---------------------------------------------------------------- Contacts
-
-@Composable
-private fun ContactsScreen(tick: Int, onRequestPerms: () -> Unit) {
-    val ctx = LocalContext.current
-    val c = One.colors
-    val granted = remember(tick) { ctx.has(Manifest.permission.READ_CONTACTS) }
-
-    if (!granted) {
-        LargeTitleScreen("Contacts", "See each contact's mobile network") {
-            item {
-                Spacer(Modifier.height(12.dp))
-                OneCard {
-                    Text("Allow access to your contacts to see a network logo next to every number.",
-                        color = c.text, fontSize = 15.sp)
-                    Spacer(Modifier.height(16.dp))
-                    OneButton("Allow", onClick = onRequestPerms)
-                }
-            }
-        }
-        return
-    }
-
-    var contacts by remember { mutableStateOf<List<ContactNumber>?>(null) }
-    LaunchedEffect(tick) {
-        contacts = withContext(Dispatchers.IO) { ContactsRepository.load(ctx) }
-    }
-    var filter by rememberSaveable { mutableStateOf<Carrier?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
-
-    val all = contacts
-    val shown = remember(all, filter, query) {
-        all.orEmpty().filter {
-            (filter == null || it.carrier == filter) &&
-                (query.isBlank() || it.name.contains(query, true) ||
-                    it.number.filter(Char::isDigit).contains(query.filter(Char::isDigit).ifEmpty { "\u0000" }))
-        }
-    }
-    val groups = remember(shown) {
-        shown.groupBy {
-            val ch = it.name.trim().firstOrNull()?.uppercaseChar() ?: '#'
-            if (ch.isLetter()) ch.toString() else "#"
-        }.toSortedMap(compareBy<String> { it == "#" }.thenBy { it })
-    }
-
-    LargeTitleScreen(
-        title = "Contacts",
-        subtitle = if (all == null) null else "${all.size} numbers",
-    ) {
-        item {
-            OneTextField(
-                value = query, onValueChange = { query = it },
-                placeholder = "Search", icon = Icons.Filled.Search,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-        }
-        if (all != null) item {
-            Row(
-                Modifier.horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                OnePill("All", filter == null, { filter = null })
-                Carrier.entries.forEach { carrier ->
-                    val n = all.count { it.carrier == carrier }
-                    if (n > 0) OnePill("${carrier.displayName} $n", filter == carrier,
-                        { filter = if (filter == carrier) null else carrier },
-                        leading = { CarrierBadge(carrier, 18.dp) })
-                }
-            }
-        }
-
-        if (all == null) {
-            item {
-                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = c.accent)
-                }
-            }
-        } else if (shown.isEmpty()) {
-            item {
-                Text("No contacts", color = c.textSecondary,
-                    modifier = Modifier.fillMaxWidth().padding(40.dp), fontSize = 15.sp)
-            }
-        }
-
-        groups.forEach { (letter, list) ->
-            item(key = "h_$letter") { GroupHeader(letter) }
-            itemsIndexed(list, key = { _, it -> "${it.contactId}:${it.number}" }) { i, item ->
-                GroupCell(i, list.size, onClick = {
-                    val uri = Uri.withAppendedPath(ContactsContract.Contacts.CONTENT_URI,
-                        item.contactId.toString())
-                    ctx.startActivity(Intent(Intent.ACTION_VIEW, uri))
-                }) {
-                    ContactAvatar(item.name, item.carrier)
-                    Spacer(Modifier.width(14.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(item.name, color = c.text, fontSize = 16.sp,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(PhoneFormat.display(item.number), color = c.textSecondary, fontSize = 13.sp)
-                            item.carrier?.let {
-                                Text("  ·  ", color = c.textSecondary, fontSize = 13.sp)
-                                Text(it.displayName, color = Color(it.colorInt), fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}

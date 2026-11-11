@@ -9,9 +9,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,13 +47,11 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
     if (!granted) {
         LargeTitleScreen("Recents", "Your calls with each caller's network") {
             item {
-                Spacer(Modifier.height(12.dp))
-                OneCard {
-                    Text("Allow access to your call history to see which network every call came from.",
-                        color = c.text, fontSize = 15.sp)
-                    Spacer(Modifier.height(16.dp))
-                    OneButton("Allow", onClick = onRequestPerms)
-                }
+                EmptyState(
+                    AppIcons.Recents, "Allow call history",
+                    "Carrier ID needs your call history to show which network every call came from.",
+                    action = "Allow", onAction = onRequestPerms,
+                )
             }
         }
         return
@@ -87,94 +84,88 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
             if (missed > 0) "$missed missed today" else "${all.size} calls"
         },
     ) {
-        item {
-            OneTextField(
-                value = query, onValueChange = { query = it },
-                placeholder = "Search", icon = Icons.Filled.Search,
-                modifier = Modifier.padding(horizontal = 12.dp),
-            )
-        }
+        item { SearchBar(query) { query = it } }
         if (all != null) item {
-            Row(
-                Modifier.horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 12.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
+            PillRow {
                 OnePill("All", !missedOnly && filter == null, { missedOnly = false; filter = null })
                 OnePill("Missed", missedOnly, { missedOnly = !missedOnly })
                 Carrier.entries.forEach { carrier ->
                     if (all.any { it.carrier == carrier }) {
                         OnePill(carrier.displayName, filter == carrier,
                             { filter = if (filter == carrier) null else carrier },
-                            leading = { CarrierBadge(carrier, 18.dp) })
+                            leading = { CarrierBadge(carrier, 20.dp) })
                     }
                 }
             }
         }
 
-        if (all == null) {
-            item {
-                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = c.accent)
+        when {
+            all == null -> item {
+                Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = c.accent, strokeWidth = 2.5.dp)
                 }
             }
-        } else if (shown.isEmpty()) {
-            item {
-                Text("No calls", color = c.textSecondary, fontSize = 15.sp,
-                    modifier = Modifier.fillMaxWidth().padding(40.dp))
+            shown.isEmpty() -> item {
+                EmptyState(AppIcons.Recents, "No calls",
+                    if (query.isNotBlank() || filter != null || missedOnly) "Try another search or filter."
+                    else "Calls you make and receive will appear here.")
             }
         }
 
         days.forEach { (day, list) ->
             item(key = "d_$day") { GroupHeader(day) }
             itemsIndexed(list, key = { _, it -> it.id }) { i, call ->
-                GroupCell(i, list.size, onClick = {
-                    if (call.number.isNotBlank()) {
-                        ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${call.number}")))
-                    }
-                }) {
+                val missed = call.kind == CallKind.MISSED || call.kind == CallKind.REJECTED
+                GroupCell(
+                    i, list.size,
+                    dividerStart = Dimens.textStart(AvatarSize),
+                    onClick = {
+                        if (call.number.isNotBlank()) {
+                            ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${call.number}")))
+                        }
+                    },
+                ) {
                     ContactAvatar(call.name ?: "", call.carrier)
-                    Spacer(Modifier.width(14.dp))
+                    Spacer(Modifier.width(Dimens.Gap))
                     Column(Modifier.weight(1f)) {
                         Text(
                             call.name ?: PhoneFormat.display(call.number).ifBlank { "Private number" },
-                            color = if (call.kind == CallKind.MISSED) MissedRed else c.text,
+                            color = if (missed) MissedRed else c.text,
                             fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
+                        Spacer(Modifier.height(3.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                kindArrow(call.kind),
-                                color = if (call.kind == CallKind.MISSED || call.kind == CallKind.REJECTED)
-                                    MissedRed else c.textSecondary,
-                                fontSize = 13.sp,
+                            Icon(
+                                kindIcon(call.kind), null,
+                                tint = if (missed) MissedRed else c.textSecondary,
+                                modifier = Modifier.size(14.dp),
                             )
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(5.dp))
                             Text(
                                 call.carrier?.displayName ?: "Unknown network",
                                 color = call.carrier?.let { Color(it.colorInt) } ?: c.textSecondary,
                                 fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                             )
                             if (call.name != null) {
-                                Text("  ·  ${PhoneFormat.display(call.number)}", color = c.textSecondary, fontSize = 13.sp,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text("  ·  ${PhoneFormat.display(call.number)}", color = c.textSecondary,
+                                    fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Text(timeOf(ctx, call.date), color = c.textSecondary, fontSize = 13.sp)
+                    Spacer(Modifier.width(10.dp))
+                    Text(timeOf(ctx, call.date), color = c.textSecondary, fontSize = 12.5.sp)
                 }
             }
         }
     }
 }
 
-private fun kindArrow(kind: CallKind) = when (kind) {
-    CallKind.INCOMING -> "↙"
-    CallKind.OUTGOING -> "↗"
-    CallKind.MISSED -> "↙"
-    CallKind.REJECTED -> "⊘"
-    CallKind.BLOCKED -> "⊘"
-    CallKind.OTHER -> "•"
+private fun kindIcon(kind: CallKind) = when (kind) {
+    CallKind.INCOMING -> AppIcons.Incoming
+    CallKind.OUTGOING -> AppIcons.Outgoing
+    CallKind.MISSED -> AppIcons.Missed
+    CallKind.REJECTED, CallKind.BLOCKED -> AppIcons.Blocked
+    CallKind.OTHER -> AppIcons.Recents
 }
 
 private fun isToday(t: Long) = DateUtils.isToday(t)
