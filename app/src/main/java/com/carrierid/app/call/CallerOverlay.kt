@@ -20,6 +20,7 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewOutlineProvider
 import android.view.WindowManager
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -232,20 +233,16 @@ object CallerOverlay {
         return outer
     }
 
-    /** Real logo (white circle) if one is set, else a coloured letter circle. */
+    /** Real logo filling the circle if one is set, else a coloured letter circle. */
     fun badgeView(ctx: Context, carrier: Carrier?, size: Int): View {
         val logo = carrier?.let { CarrierLogos.bitmap(ctx, it) }
         val view: View = if (logo != null) {
+            // Pre-shaped square logo, cropped to a circle edge to edge (no white ring)
             ImageView(ctx).apply {
                 setImageBitmap(logo)
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                val pad = (size * 0.12f).toInt()
-                setPadding(pad, pad, pad, pad)
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(Color.WHITE)
-                    setStroke(1, Color.parseColor("#22000000"))
-                }
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                background = GradientDrawable().apply { shape = GradientDrawable.OVAL }
+                outlineProvider = ViewOutlineProvider.BACKGROUND
                 clipToOutline = true
             }
         } else {

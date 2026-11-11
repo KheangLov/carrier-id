@@ -36,16 +36,20 @@ object CarrierLogos {
 
     fun hasCustom(ctx: Context, carrier: Carrier) = file(ctx, carrier).exists()
 
-    /** The logo as a bitmap (user-picked first, then bundled), or null if none. */
+    /**
+     * The logo ready for a round badge: a square bitmap that fills the circle
+     * edge to edge (user-picked first, then bundled), or null if there is none.
+     */
     @Synchronized
     fun bitmap(ctx: Context, carrier: Carrier): Bitmap? = cache.getOrPut(carrier) {
         val f = file(ctx, carrier)
-        when {
+        val raw = when {
             f.exists() -> BitmapFactory.decodeFile(f.absolutePath)
             drawableId(ctx, carrier) != 0 ->
                 BitmapFactory.decodeResource(ctx.resources, drawableId(ctx, carrier))
             else -> null
         }
+        raw?.let { LogoShaper.toBadge(it) }
     }
 
     /** Copies an image the user picked into app storage (max 384 px, on white). */

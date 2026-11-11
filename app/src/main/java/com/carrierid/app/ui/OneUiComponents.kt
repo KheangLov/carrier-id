@@ -412,7 +412,7 @@ fun EmptyState(icon: ImageVector, title: String, body: String, action: String? =
 }
 
 /**
- * Carrier logo in a white circle. Uses the logo picked in Settings → Networks
+ * Carrier logo filling a circle. Uses the logo picked in Settings → Networks
  * (or a bundled one); falls back to a coloured letter circle when there is none.
  */
 @Composable
@@ -421,17 +421,13 @@ fun CarrierBadge(carrier: Carrier?, size: Dp, modifier: Modifier = Modifier) {
     val version by CarrierLogos.version
     val logo = remember(carrier, version) { carrier?.let { LogoImages.get(ctx, it, version) } }
     if (logo != null) {
-        Box(
-            modifier.size(size).clip(CircleShape).background(Color.White)
-                .border(0.5.dp, Color(0x1F000000), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Image(
-                logo, contentDescription = carrier?.displayName,
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize().padding(size * 0.12f),
-            )
-        }
+        // Logo is pre-shaped to a square (LogoShaper), so it covers the circle edge to edge
+        Image(
+            logo, contentDescription = carrier?.displayName,
+            contentScale = ContentScale.Crop,
+            modifier = modifier.size(size).clip(CircleShape)
+                .border(0.5.dp, Color(0x14000000), CircleShape),
+        )
     } else {
         Box(
             modifier.size(size).clip(CircleShape)
