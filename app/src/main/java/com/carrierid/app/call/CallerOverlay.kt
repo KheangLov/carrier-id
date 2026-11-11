@@ -27,6 +27,7 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import com.carrierid.app.carrier.Carrier
 import com.carrierid.app.carrier.CarrierLogos
+import com.carrierid.app.carrier.CarrierLookup
 
 /**
  * The floating card shown over the incoming-call screen:
@@ -47,16 +48,22 @@ object CallerOverlay {
 
     private val main = Handler(Looper.getMainLooper())
     private var view: View? = null
+    private var shownKey: String? = null
+    private var dismissedKey: String? = null   // user tapped ✕ during this call
     private var wm: WindowManager? = null
     private var appContext: Context? = null
     private var callStateCleanup: (() -> Unit)? = null
     private val autoHide = Runnable { hide() }
 
-    fun show(context: Context, number: String, carrier: Carrier?) {
+    fun show(context: Context, number: String, carrier: Carrier?, preview: Boolean = false) {
         val app = context.applicationContext
         if (!Settings.canDrawOverlays(app)) return
 
+        val key = CarrierLookup.normalize(number) ?: number.filter { it.isDigit() }
         main.post {
+            // Already showing this caller (both detection paths fired) → nothing to do
+            if (view != null && shownKey == key) return@post
+            if (!preview && key == dismissedKey) return@post
             hide()
             appContext = app
             val windowManager = app.getSystemService(WindowManager::class.java)
@@ -81,6 +88,7 @@ object CallerOverlay {
                 return@post
             }
             view = card
+            shownKey = key
             wm = windowManager
 
             // Start the keep-alive service AFTER the overlay is visible: on
@@ -91,12 +99,19 @@ object CallerOverlay {
         }
     }
 
+    /** Called when the phone goes back to idle. */
+    fun onCallEnded() {
+        dismissedKey = null
+        hide()
+    }
+
     fun hide() {
         main.removeCallbacks(autoHide)
         callStateCleanup?.invoke()
         callStateCleanup = null
         view?.let { v -> runCatching { wm?.removeView(v) } }
         view = null
+        shownKey = null
         appContext?.let { CallWatcherService.stop(it) }
     }
 
@@ -114,7 +129,7 @@ object CallerOverlay {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val cb = object : TelephonyCallback(), TelephonyCallback.CallStateListener {
                     override fun onCallStateChanged(state: Int) {
-                        if (state == TelephonyManager.CALL_STATE_IDLE) main.post { hide() }
+                        if (state == TelephonyManager.CALL_STATE_IDLE) main.post { onCallEnded() }
                     }
                 }
                 tm.registerTelephonyCallback(ContextCompat.getMainExecutor(context), cb)
@@ -122,7 +137,7 @@ object CallerOverlay {
             } else {
                 val listener = object : PhoneStateListener() {
                     override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-                        if (state == TelephonyManager.CALL_STATE_IDLE) main.post { hide() }
+                        if (state == TelephonyManager.CALL_STATE_IDLE) main.post { onCallEnded() }
                     }
                 }
                 tm.listen(listener, PhoneStateListener.LISTEN_CALL_STATE)
@@ -180,7 +195,7 @@ object CallerOverlay {
                 shape = GradientDrawable.OVAL
                 setColor(if (dark) Color.parseColor("#2E2E2E") else Color.parseColor("#EFEFEF"))
             }
-            setOnClickListener { hide() }
+            setOnClickListener { dismissedKey = shownKey; hide() }
         }, LinearLayout.LayoutParams(dp(ctx, 28), dp(ctx, 28)))
         card.addView(header)
 
@@ -213,20 +228,28 @@ object CallerOverlay {
         return outer
     }
 
-    /** Real logo if you've added one to res/drawable, else a coloured letter circle. */
+    /** Real logo (white circle) if one is set, else a coloured letter circle. */
     fun badgeView(ctx: Context, carrier: Carrier?, size: Int): View {
-        val logoId = carrier?.let { CarrierLogos.drawableId(ctx, it) } ?: 0
-        val view: View = if (logoId != 0) {
+        val logo = carrier?.let { CarrierLogos.bitmap(ctx, it) }
+        val view: View = if (logo != null) {
             ImageView(ctx).apply {
-                setImageResource(logoId)
+                setImageBitmap(logo)
                 scaleType = ImageView.ScaleType.FIT_CENTER
+                val pad = (size * 0.12f).toInt()
+                setPadding(pad, pad, pad, pad)
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(Color.WHITE)
+                    setStroke(1, Color.parseColor("#22000000"))
+                }
+                clipToOutline = true
             }
         } else {
             TextView(ctx).apply {
                 text = carrier?.initial ?: "?"
                 gravity = Gravity.CENTER
                 setTextColor(Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
                 typeface = Typeface.DEFAULT_BOLD
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL

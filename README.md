@@ -22,18 +22,14 @@ Minimum Android version: 10 (API 29). Target: Android 15 (API 35).
 
 ## Adding the real logos
 
-The app draws a coloured letter badge until you add logo files. Put square
-PNG/WebP images (about 192×192 px) in `app/src/main/res/drawable/` with these
-names, and they are used everywhere automatically:
+**In the app (easiest):** Settings → *Networks & logos* → tap a network → pick
+the logo image from your photos. It is used on the call card, in Recents and
+in Contacts. Tap *Remove* to go back to the coloured letter badge.
 
-| Carrier  | File name           |
-|----------|---------------------|
-| Smart    | `logo_smart.png`    |
-| Cellcard | `logo_cellcard.png` |
-| Metfone  | `logo_metfone.png`  |
-| Seatel   | `logo_seatel.png`   |
-| CooTel   | `logo_cootel.png`   |
-| qb       | `logo_qb.png`       |
+**Bundled with the app:** put square PNGs named `logo_smart.png`,
+`logo_cellcard.png`, `logo_metfone.png`, `logo_seatel.png`, `logo_cootel.png`,
+`logo_qb.png` in `app/src/main/res/drawable/`. A logo picked in the app wins
+over a bundled one.
 
 Logos are trademarks of each operator. Personal use is fine; for a Play Store
 release, get permission or keep the coloured badges.
@@ -46,7 +42,9 @@ release, get permission or keep the coloured badges.
 | `call/CallerIdScreeningService.kt` | Receives incoming calls, never blocks them |
 | `call/CallerOverlay.kt` | The floating card (drag up/down to move; position is remembered) |
 | `call/CallWatcherService.kt` | Keeps the app alive while the card is visible |
-| `ui/MainActivity.kt` | Setup checklist, number checker, contacts list with filters |
+| `call/IncomingCallReceiver.kt` | Backup detector (system PHONE_STATE broadcast) so the card shows even if Android skips the screening service |
+| `ui/RecentsScreen.kt` | Call history with each caller's network |
+| `ui/MainActivity.kt` | Tabs, settings checklist, number checker, contacts list, logo picker |
 
 ## Updating prefixes
 

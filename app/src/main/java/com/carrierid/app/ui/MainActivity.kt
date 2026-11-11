@@ -14,7 +14,17 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import android.annotation.SuppressLint
+import android.content.ActivityNotFoundException
+import android.widget.Toast
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import com.carrierid.app.carrier.CarrierLogos
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -62,29 +72,57 @@ class MainActivity : ComponentActivity() {
     private val permsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { resumeTick++ }
 
+    /** Carrier whose logo the user is picking right now. */
+    private var pickingLogoFor: Carrier? = null
+    private val logoPicker =
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            val carrier = pickingLogoFor ?: return@registerForActivityResult
+            pickingLogoFor = null
+            if (uri == null) return@registerForActivityResult
+            lifecycleScope.launch {
+                val ok = withContext(Dispatchers.IO) { CarrierLogos.save(this@MainActivity, carrier, uri) }
+                Toast.makeText(
+                    this@MainActivity,
+                    if (ok) "${carrier.displayName} logo saved" else "Couldn't use that image",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+
+    private fun pickLogo(carrier: Carrier) {
+        pickingLogoFor = carrier
+        logoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val startOnContacts = holdsScreeningRole() && has(Manifest.permission.READ_CONTACTS)
         setContent {
             OneUiTheme {
-                var tab by rememberSaveable { mutableIntStateOf(if (startOnContacts) 0 else 1) }
+                var tab by rememberSaveable { mutableIntStateOf(if (startOnContacts) 0 else 2) }
                 Column(Modifier.fillMaxSize().background(One.colors.background)) {
                     Box(Modifier.weight(1f)) {
                         when (tab) {
-                            0 -> ContactsScreen(resumeTick, ::requestRuntimePerms)
+                            0 -> RecentsScreen(resumeTick, ::requestRuntimePerms)
+                            1 -> ContactsScreen(resumeTick, ::requestRuntimePerms)
                             else -> SettingsScreen(
                                 tick = resumeTick,
                                 onRequestRole = ::requestScreeningRole,
                                 onRequestOverlay = ::openOverlaySettings,
                                 onRequestPerms = ::requestRuntimePerms,
                                 onOpenBattery = ::openBatterySettings,
+                                onPickLogo = ::pickLogo,
                             )
                         }
                     }
                     OneBottomBar(
                         selected = tab,
-                        items = listOf(Icons.Filled.Person to "Contacts", Icons.Filled.Settings to "Settings"),
+                        items = listOf(
+                            Icons.Filled.Call to "Recents",
+                            Icons.Filled.Person to "Contacts",
+                            Icons.Filled.Settings to "Settings",
+                        ),
                         onSelect = { tab = it },
                     )
                 }
@@ -112,7 +150,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestRuntimePerms() {
-        val perms = mutableListOf(Manifest.permission.READ_CONTACTS, Manifest.permission.READ_PHONE_STATE)
+        val perms = mutableListOf(
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) perms += Manifest.permission.POST_NOTIFICATIONS
         val allGranted = perms.all { has(it) }
         if (allGranted) {
@@ -123,8 +165,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun openBatterySettings() {
-        // On Samsung, also: Settings > Battery > Background usage limits > Never sleeping apps
-        startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        val appSettings = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName"))
+        val pm = getSystemService(PowerManager::class.java)
+        if (pm.isIgnoringBatteryOptimizations(packageName)) {
+            // Already allowed: open App info (Battery → Unrestricted) so it can be changed.
+            startActivity(appSettings)
+            return
+        }
+        // Shows the system dialog "Let app always run in background?" → Allow
+        @SuppressLint("BatteryLife")
+        val ask = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
+        try {
+            startActivity(ask)
+        } catch (e: ActivityNotFoundException) {
+            // Some phones hide that dialog: App info → Battery → Unrestricted
+            startActivity(appSettings)
+            Toast.makeText(this, "Tap Battery, then choose Unrestricted", Toast.LENGTH_LONG).show()
+        }
     }
 }
 
@@ -157,18 +214,21 @@ private fun SettingsScreen(
     onRequestOverlay: () -> Unit,
     onRequestPerms: () -> Unit,
     onOpenBattery: () -> Unit,
+    onPickLogo: (Carrier) -> Unit,
 ) {
     val ctx = LocalContext.current
     val c = One.colors
+    val logoVersion by CarrierLogos.version
     val items = remember(tick) {
         listOf(
             SetupItem(Icons.Filled.Call, Color(0xFF34B36B), "Caller ID app",
                 "Let Carrier ID see incoming numbers", ctx.holdsScreeningRole(), onRequestRole),
             SetupItem(Icons.Filled.Info, Color(0xFF3E7BFA), "Show over call screen",
                 "Needed to display the network card", Settings.canDrawOverlays(ctx), onRequestOverlay),
-            SetupItem(Icons.Filled.Person, Color(0xFFF59B3A), "Contacts & phone",
-                "Show logos in your contacts", ctx.has(Manifest.permission.READ_CONTACTS) &&
-                    ctx.has(Manifest.permission.READ_PHONE_STATE), onRequestPerms),
+            SetupItem(Icons.Filled.Person, Color(0xFFF59B3A), "Contacts, calls & phone",
+                "Logos in contacts and call history", ctx.has(Manifest.permission.READ_CONTACTS) &&
+                    ctx.has(Manifest.permission.READ_PHONE_STATE) &&
+                    ctx.has(Manifest.permission.READ_CALL_LOG), onRequestPerms),
             SetupItem(Icons.Filled.Refresh, Color(0xFF8E6CEF), "Keep running",
                 "Stop the phone from putting it to sleep", ctx.ignoresBatteryOpt(), onOpenBattery),
         )
@@ -218,7 +278,7 @@ private fun SettingsScreen(
                 Spacer(Modifier.height(16.dp))
                 OneButton("Preview call card", enabled = overlayOk) {
                     val n = input.ifBlank { "012 345 678" }
-                    CallerOverlay.show(ctx, n, CarrierLookup.lookup(n))
+                    CallerOverlay.show(ctx, n, CarrierLookup.lookup(n), preview = true)
                 }
                 if (!overlayOk) {
                     Spacer(Modifier.height(8.dp))
@@ -228,16 +288,36 @@ private fun SettingsScreen(
             }
         }
 
-        item { GroupHeader("Networks") }
+        item { GroupHeader("Networks & logos") }
+        item {
+            Text(
+                "Tap a network to choose its logo from your photos. Save each company's " +
+                    "logo image from its website or Facebook page first.",
+                color = c.textSecondary, fontSize = 13.sp,
+                modifier = Modifier.padding(start = 30.dp, end = 30.dp, bottom = 10.dp),
+            )
+        }
         val carriers = Carrier.entries
         itemsIndexed(carriers) { i, carrier ->
-            GroupCell(i, carriers.size) {
-                CarrierBadge(carrier, 36.dp)
+            val custom = remember(logoVersion, carrier) { CarrierLogos.hasCustom(ctx, carrier) }
+            GroupCell(i, carriers.size, onClick = { onPickLogo(carrier) }) {
+                CarrierBadge(carrier, 40.dp)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(carrier.displayName, color = c.text, fontSize = 16.sp)
                     Text(CarrierLookup.prefixesOf(carrier).joinToString("  "),
                         color = c.textSecondary, fontSize = 13.sp)
+                }
+                if (custom) {
+                    Text(
+                        "Remove", color = c.textSecondary, fontSize = 13.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(50))
+                            .clickable { CarrierLogos.remove(ctx, carrier) }
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    )
+                } else {
+                    Text("Add logo", color = c.accent, fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold)
                 }
             }
         }

@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
@@ -35,7 +36,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -303,14 +305,29 @@ fun OneBottomBar(selected: Int, items: List<Pair<ImageVector, String>>, onSelect
     }
 }
 
-/** Uses your logo file if present (res/drawable/logo_xxx), otherwise a coloured letter circle. */
+/**
+ * Carrier logo in a white circle. Uses the logo picked in Settings → Networks
+ * (or a bundled one); falls back to a coloured letter circle when there is none.
+ */
 @Composable
 fun CarrierBadge(carrier: Carrier?, size: Dp, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
-    val logoId = remember(carrier) { carrier?.let { CarrierLogos.drawableId(ctx, it) } ?: 0 }
-    if (logoId != 0) {
-        Image(painterResource(logoId), contentDescription = carrier?.displayName,
-            modifier = modifier.size(size).clip(CircleShape))
+    val version by CarrierLogos.version
+    val logo = remember(carrier, version) {
+        carrier?.let { CarrierLogos.bitmap(ctx, it)?.asImageBitmap() }
+    }
+    if (logo != null) {
+        Box(
+            modifier.size(size).clip(CircleShape).background(Color.White)
+                .border(0.5.dp, Color(0x22000000), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                logo, contentDescription = carrier?.displayName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().padding(size * 0.12f),
+            )
+        }
     } else {
         Box(
             modifier.size(size).clip(CircleShape)
@@ -332,14 +349,21 @@ private val AvatarColors = listOf(
 @Composable
 fun ContactAvatar(name: String, carrier: Carrier?) {
     val c = One.colors
-    val color = AvatarColors[(name.hashCode() and 0x7fffffff) % AvatarColors.size]
+    val first = name.trim().firstOrNull()
+    val color = if (first == null || !first.isLetter()) Color(0xFFB8C0CC)
+        else AvatarColors[(name.hashCode() and 0x7fffffff) % AvatarColors.size]
     Box(Modifier.size(48.dp)) {
         Box(
             Modifier.size(46.dp).clip(CircleShape).background(color),
             contentAlignment = Alignment.Center,
         ) {
-            Text(name.trim().firstOrNull()?.uppercase() ?: "#", color = Color.White,
-                fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+            if (first != null && first.isLetter()) {
+                Text(first.uppercase(), color = Color.White,
+                    fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+            } else {
+                // Unsaved number: person silhouette, like the Samsung Phone app
+                Icon(Icons.Filled.Person, null, tint = Color.White, modifier = Modifier.size(26.dp))
+            }
         }
         if (carrier != null) {
             CarrierBadge(

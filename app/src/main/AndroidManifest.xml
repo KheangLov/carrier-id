@@ -5,6 +5,10 @@
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <!-- Detect when the call ends so the overlay can be removed -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- Recents tab + caller number for the backup call detector -->
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <!-- "Keep running" switch: shows the system "allow background" dialog -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Draw the carrier card over Samsung's call screen -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Keep the app alive while a call is ringing / active -->
@@ -39,6 +43,14 @@
                 <action android:name="android.telecom.CallScreeningService" />
             </intent-filter>
         </service>
+
+        <receiver
+            android:name=".call.IncomingCallReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".call.CallWatcherService"
