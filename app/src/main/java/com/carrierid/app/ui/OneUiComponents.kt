@@ -77,7 +77,8 @@ fun LargeTitleScreen(
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 28.dp),
+            // Leave room so the last rows can scroll above the floating glass tab bar
+            contentPadding = PaddingValues(bottom = 28.dp + LocalBottomBarSpace.current),
         ) {
             item(key = "__large_title") {
                 Column(
@@ -274,35 +275,6 @@ fun OneButton(text: String, enabled: Boolean = true, onClick: () -> Unit) {
     ) {
         Text(text, color = if (enabled) Color.White else c.textSecondary,
             fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-/** One UI bottom tab bar: icon + label, selected tab bold. */
-@Composable
-fun OneBottomBar(selected: Int, items: List<Pair<ImageVector, String>>, onSelect: (Int) -> Unit) {
-    val c = One.colors
-    Column(Modifier.fillMaxWidth().background(c.background)) {
-        HorizontalDivider(thickness = 0.5.dp, color = c.divider)
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(62.dp)) {
-            items.forEachIndexed { i, (icon, label) ->
-                val sel = i == selected
-                Column(
-                    Modifier.weight(1f).fillMaxHeight().clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onSelect(i) },
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Icon(icon, null, tint = if (sel) c.text else c.textSecondary,
-                        modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.height(2.dp))
-                    Text(label, fontSize = 12.sp,
-                        color = if (sel) c.text else c.textSecondary,
-                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Normal)
-                }
-            }
-        }
     }
 }
 

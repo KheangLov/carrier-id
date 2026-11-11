@@ -33,6 +33,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Call
+import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
@@ -101,8 +104,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             OneUiTheme {
                 var tab by rememberSaveable { mutableIntStateOf(if (startOnContacts) 0 else 2) }
-                Column(Modifier.fillMaxSize().background(One.colors.background)) {
-                    Box(Modifier.weight(1f)) {
+                GlassScaffold(
+                    selected = tab,
+                    tabs = listOf(
+                        TabItem("Recents", Icons.Outlined.Call, Icons.Filled.Call),
+                        TabItem("Contacts", Icons.Outlined.Person, Icons.Filled.Person),
+                        TabItem("Settings", Icons.Outlined.Settings, Icons.Filled.Settings),
+                    ),
+                    onSelect = { tab = it },
+                ) {
+                    Box(Modifier.fillMaxSize().background(One.colors.background)) {
                         when (tab) {
                             0 -> RecentsScreen(resumeTick, ::requestRuntimePerms)
                             1 -> ContactsScreen(resumeTick, ::requestRuntimePerms)
@@ -116,15 +127,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
-                    OneBottomBar(
-                        selected = tab,
-                        items = listOf(
-                            Icons.Filled.Call to "Recents",
-                            Icons.Filled.Person to "Contacts",
-                            Icons.Filled.Settings to "Settings",
-                        ),
-                        onSelect = { tab = it },
-                    )
                 }
             }
         }
