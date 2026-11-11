@@ -44,7 +44,7 @@ class CallWatcherService : Service() {
             )
         }
         return Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_app)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(getString(R.string.notif_title))
             .setOngoing(true)
             .build()

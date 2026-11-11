@@ -1,3 +1,5 @@
 <resources>
-    <style name="Theme.CarrierID" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.CarrierID" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/one_bg</item>
+    </style>
 </resources>

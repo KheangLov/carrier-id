@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
@@ -133,47 +134,80 @@ object CallerOverlay {
     // ---------- UI ----------
 
     private fun buildCard(ctx: Context, number: String, carrier: Carrier?): View {
-        val outer = LinearLayout(ctx).apply {
-            setPadding(dp(ctx, 16), 0, dp(ctx, 16), 0)
-        }
+        val dark = (ctx.resources.configuration.uiMode and
+            Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        val cardColor = if (dark) Color.parseColor("#1E1E1E") else Color.WHITE
+        val textColor = if (dark) Color.parseColor("#F5F5F5") else Color.parseColor("#111111")
+        val secondary = if (dark) Color.parseColor("#9A9A9A") else Color.parseColor("#7D7D7D")
+        val accent = carrier?.colorInt ?: secondary
+
+        val outer = LinearLayout(ctx).apply { setPadding(dp(ctx, 12), dp(ctx, 10), dp(ctx, 12), dp(ctx, 14)) }
+
+        // One UI style: big rounded card, soft shadow, no border
         val card = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(ctx, 20), dp(ctx, 14), dp(ctx, 14), dp(ctx, 18))
+            background = GradientDrawable().apply {
+                cornerRadius = dp(ctx, 26).toFloat()
+                setColor(cardColor)
+            }
+            elevation = dp(ctx, 10).toFloat()
+        }
+
+        // Header: "Carrier ID · Incoming call"                       ✕
+        val header = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(ctx, 14), dp(ctx, 12), dp(ctx, 10), dp(ctx, 12))
-            background = GradientDrawable().apply {
-                cornerRadius = dp(ctx, 20).toFloat()
-                setColor(Color.WHITE)
-                setStroke(dp(ctx, 2), carrier?.colorInt ?: Color.LTGRAY)
-            }
-            elevation = dp(ctx, 8).toFloat()
         }
+        header.addView(View(ctx).apply {
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(accent)
+            }
+        }, LinearLayout.LayoutParams(dp(ctx, 8), dp(ctx, 8)))
+        header.addView(TextView(ctx).apply {
+            text = "Carrier ID  ·  Incoming call"
+            setTextColor(secondary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(dp(ctx, 8), 0, 0, 0)
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(TextView(ctx).apply {
+            text = "✕"
+            gravity = Gravity.CENTER
+            setTextColor(secondary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(if (dark) Color.parseColor("#2E2E2E") else Color.parseColor("#EFEFEF"))
+            }
+            setOnClickListener { hide() }
+        }, LinearLayout.LayoutParams(dp(ctx, 28), dp(ctx, 28)))
+        card.addView(header)
 
-        card.addView(badgeView(ctx, carrier, dp(ctx, 44)))
-
+        // Body: logo + network name + number
+        val body = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(ctx, 10), 0, 0)
+        }
+        body.addView(badgeView(ctx, carrier, dp(ctx, 52)))
         val texts = LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(ctx, 12), 0, 0, 0)
+            setPadding(dp(ctx, 14), 0, 0, 0)
         }
         texts.addView(TextView(ctx).apply {
             text = carrier?.displayName ?: "Unknown network"
-            setTextColor(carrier?.colorInt ?: Color.DKGRAY)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(textColor)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         })
         texts.addView(TextView(ctx).apply {
             text = number
-            setTextColor(Color.GRAY)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(secondary)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
         })
-        card.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
-
-        card.addView(TextView(ctx).apply {
-            text = "✕"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            setTextColor(Color.GRAY)
-            setPadding(dp(ctx, 12), dp(ctx, 6), dp(ctx, 6), dp(ctx, 6))
-            setOnClickListener { hide() }
-        })
+        body.addView(texts, LinearLayout.LayoutParams(0, -2, 1f))
+        card.addView(body)
 
         outer.addView(card, LinearLayout.LayoutParams(-1, -2))
         return outer
