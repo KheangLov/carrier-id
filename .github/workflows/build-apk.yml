@@ -21,11 +21,22 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # Optional: stable signing key from repository secrets (Settings → Secrets → Actions)
+      # Stable signing key from repository secrets (Settings → Secrets → Actions).
+      # Either Carrier ID's own secrets, or the same key as Pratitin
+      # (PRATITIN_KEYSTORE_BASE64 + PRATITIN_KEYSTORE_PASSWORD, key alias "pratitin").
       - name: Restore signing key
         env:
           KEYSTORE_B64: ${{ secrets.CARRIERID_KEYSTORE_B64 }}
+          PRATITIN_B64: ${{ secrets.PRATITIN_KEYSTORE_BASE64 }}
+          PRATITIN_PASSWORD: ${{ secrets.PRATITIN_KEYSTORE_PASSWORD }}
         run: |
+          if [ -z "$KEYSTORE_B64" ] && [ -n "$PRATITIN_B64" ]; then
+            KEYSTORE_B64="$PRATITIN_B64"
+            echo "CARRIERID_KEY_ALIAS=pratitin" >> "$GITHUB_ENV"
+            echo "::add-mask::$PRATITIN_PASSWORD"
+            echo "CARRIERID_PRATITIN_PASSWORD=$PRATITIN_PASSWORD" >> "$GITHUB_ENV"
+            echo "Using the Pratitin signing key"
+          fi
           if [ -n "$KEYSTORE_B64" ]; then
             echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/carrierid.jks"
             echo "CARRIERID_KEYSTORE=$RUNNER_TEMP/carrierid.jks" >> "$GITHUB_ENV"
@@ -38,6 +49,7 @@ jobs:
         env:
           CARRIERID_KEYSTORE_PASSWORD: ${{ secrets.CARRIERID_KEYSTORE_PASSWORD }}
         run: |
+          if [ -z "$CARRIERID_KEYSTORE_PASSWORD" ]; then export CARRIERID_KEYSTORE_PASSWORD="$CARRIERID_PRATITIN_PASSWORD"; fi
           chmod +x gradlew
           ./gradlew testReleaseUnitTest assembleRelease --stacktrace
           cp app/build/outputs/apk/release/app-release.apk CarrierID.apk
