@@ -24,6 +24,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.carrierid.app.carrier.Carrier
+import com.carrierid.app.notes.CallNote
+import com.carrierid.app.notes.CallNotes
+import com.carrierid.app.settings.Features
+import com.carrierid.app.spam.BlockStore
+import com.carrierid.app.spam.SpamRules
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.window.Dialog
+import kotlin.math.abs
 import com.carrierid.app.ui.theme.One
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -62,14 +74,21 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
         calls = withContext(Dispatchers.IO) { CallLogRepository.load(ctx) }
     }
     var missedOnly by rememberSaveable { mutableStateOf(false) }
+    var blockedOnly by rememberSaveable { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<CallEntry?>(null) }
+    val fv by Features.version
+    val nv by CallNotes.version
+    val blockList = remember(fv) { BlockStore.blocked(ctx) }
+    val notes = remember(nv) { CallNotes.all(ctx) }
     var filter by rememberSaveable { mutableStateOf<Carrier?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
 
     val all = calls
-    val shown = remember(all, missedOnly, filter, query) {
+    val shown = remember(all, missedOnly, blockedOnly, filter, query) {
         val digits = query.filter(Char::isDigit)
         all.orEmpty().filter {
             (!missedOnly || it.kind == CallKind.MISSED) &&
+                (!blockedOnly || it.kind == CallKind.BLOCKED) &&
                 (filter == null || it.carrier == filter) &&
                 (query.isBlank() || (it.name?.contains(query, true) == true) ||
                     (digits.isNotEmpty() && it.number.filter(Char::isDigit).contains(digits)))
@@ -89,8 +108,12 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
         item { SearchBar(query) { query = it } }
         if (all != null) item {
             PillRow {
-                OnePill("All", !missedOnly && filter == null, { missedOnly = false; filter = null })
-                OnePill("Missed", missedOnly, { missedOnly = !missedOnly })
+                OnePill("All", !missedOnly && !blockedOnly && filter == null,
+                    { missedOnly = false; blockedOnly = false; filter = null })
+                OnePill("Missed", missedOnly, { missedOnly = !missedOnly; blockedOnly = false })
+                if (all.any { it.kind == CallKind.BLOCKED }) {
+                    OnePill("Blocked", blockedOnly, { blockedOnly = !blockedOnly; missedOnly = false })
+                }
                 Carrier.entries.forEach { carrier ->
                     if (carrier in present) {
                         OnePill(carrier.displayName, filter == carrier,
@@ -109,7 +132,7 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
             }
             shown.isEmpty() -> item {
                 EmptyState(AppIcons.Recents, "No calls",
-                    if (query.isNotBlank() || filter != null || missedOnly) "Try another search or filter."
+                    if (query.isNotBlank() || filter != null || missedOnly || blockedOnly) "Try another search or filter."
                     else "Calls you make and receive will appear here.")
             }
         }
@@ -121,12 +144,12 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
                 GroupCell(
                     i, list.size,
                     dividerStart = Dimens.textStart(AvatarSize),
-                    onClick = {
-                        if (call.number.isNotBlank()) {
-                            ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${call.number}")))
-                        }
-                    },
+                    onClick = { if (call.number.isNotBlank()) selected = call },
                 ) {
+                    val note = remember(notes, call.id) { noteFor(notes, call) }
+                    val isBlocked = remember(blockList, call.number) {
+                        SpamRules.matches(blockList, call.number)
+                    }
                     ContactAvatar(call.name ?: "", call.carrier)
                     Spacer(Modifier.width(Dimens.Gap))
                     Column(Modifier.weight(1f)) {
@@ -152,6 +175,18 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
                                 Text("  ·  ${PhoneFormat.display(call.number)}", color = c.textSecondary,
                                     fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
+                            if (isBlocked) {
+                                Text("  ·  Blocked", color = MissedRed, fontSize = 13.sp, maxLines = 1)
+                            }
+                        }
+                        if (note != null && note.preview.isNotBlank()) {
+                            Spacer(Modifier.height(3.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(AppIcons.Note, null, tint = c.textSecondary, modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text(note.preview, color = c.textSecondary, fontSize = 13.sp,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                     }
                     Spacer(Modifier.width(10.dp))
@@ -159,6 +194,97 @@ fun RecentsScreen(tick: Int, onRequestPerms: () -> Unit) {
                 }
             }
         }
+    }
+    selected?.let { CallActionsDialog(it) { selected = null } }
+}
+
+private fun noteFor(notes: List<CallNote>, call: CallEntry): CallNote? {
+    val k = SpamRules.key(call.number) ?: return null
+    return notes.filter { it.key == k && abs(it.time - call.date) <= 3 * 60 * 1000L }
+        .minByOrNull { abs(it.time - call.date) }
+}
+
+/** Actions for one call: call back, text, note, block, report spam. */
+@Composable
+private fun CallActionsDialog(call: CallEntry, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val c = One.colors
+    val fv by Features.version
+    val nv by CallNotes.version
+    val blocked = remember(fv) { BlockStore.isBlocked(ctx, call.number) }
+    val reported = remember(fv) { BlockStore.isReported(ctx, call.number) }
+    val note = remember(nv) { CallNotes.forCall(ctx, call.number, call.date) }
+    val inContacts = call.name != null
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(c.card)
+                .padding(vertical = 18.dp)
+        ) {
+            Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                ContactAvatar(call.name ?: "", call.carrier)
+                Spacer(Modifier.width(Dimens.Gap))
+                Column(Modifier.weight(1f)) {
+                    Text(call.name ?: PhoneFormat.display(call.number), color = c.text, fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        listOfNotNull(
+                            call.carrier?.displayName ?: "Unknown network",
+                            if (call.name != null) PhoneFormat.display(call.number) else null,
+                        ).joinToString("  ·  "),
+                        color = c.textSecondary, fontSize = 13.sp,
+                    )
+                }
+            }
+            if (note != null && note.preview.isNotBlank()) {
+                Text(
+                    note.preview, color = c.text, fontSize = 14.sp, lineHeight = 19.sp, maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp).fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp)).background(c.field).padding(12.dp),
+                )
+            }
+            Spacer(Modifier.height(10.dp))
+            ActionRow(AppIcons.Phone, "Call") {
+                ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${Uri.encode(call.number)}")))
+                onDismiss()
+            }
+            ActionRow(AppIcons.Message, "Send message") {
+                runCatching {
+                    ctx.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(call.number)}")))
+                }
+                onDismiss()
+            }
+            ActionRow(AppIcons.Note, if (note != null) "Edit note" else "Add note") {
+                ctx.startActivity(CallNoteActivity.intent(ctx, call.number, call.date))
+                onDismiss()
+            }
+            if (blocked) {
+                ActionRow(AppIcons.Blocked, "Unblock") { BlockStore.unblock(ctx, call.number) }
+            } else {
+                ActionRow(AppIcons.Blocked, "Block number", MissedRed) { BlockStore.block(ctx, call.number) }
+            }
+            if (!inContacts) {
+                if (reported) {
+                    ActionRow(AppIcons.Shield, "Not spam") { BlockStore.unreport(ctx, call.number) }
+                } else {
+                    ActionRow(AppIcons.Warning, "Report as spam", MissedRed) { BlockStore.report(ctx, call.number) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionRow(icon: ImageVector, text: String, color: Color? = null, onClick: () -> Unit) {
+    val c = One.colors
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 22.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = color ?: c.accent, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(text, color = color ?: c.text, fontSize = 16.sp)
     }
 }
 

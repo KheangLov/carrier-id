@@ -8,7 +8,7 @@ with a carrier logo next to every number.
 
 1. Open this folder in **Android Studio** (Ladybug or newer) → let Gradle sync.
 2. Plug in your Samsung phone with USB debugging on → **Run ▶**.
-3. In the app's **Setup** tab, enable all 4 steps:
+3. In the app's **Settings** tab, enable all 4 setup steps:
    1. **Caller ID & spam app** – Android then sends every incoming number to the app.
    2. **Display over other apps** – lets the card appear above the call screen.
    3. **Contacts & phone** – contacts list; also needed so calls from *saved*
@@ -19,6 +19,33 @@ with a carrier logo next to every number.
    without a real call. Then have someone call you.
 
 Minimum Android version: 10 (API 29). Target: Android 15 (API 35).
+
+## Features
+
+**Spam & blocking** (Settings → Spam & blocking). Everything is checked on the
+phone; no number is uploaded.
+- Red warning on the call card with the reason (reported by you, faked caller
+  ID, scam-prone country code, hidden number, repeat ring-and-hang-up, abroad).
+- Automatic blocking you choose: spam & scam codes (on by default), hidden
+  numbers, international numbers, repeat callers, or everyone not in contacts.
+- Your own block list, including prefixes (`+234*`, `023*`). Contacts are never
+  blocked unless you add them.
+- Block / report from the call card or by tapping a call in Recents.
+- Blocked calls are rejected silently, listed in the app, with an optional
+  quiet notification. Needs the *Caller ID & spam app* setup step.
+
+**Messages** (Settings → Messages)
+- Quick replies on the call card: one tap texts the caller and declines the call.
+- Auto-reply: texts people back after a missed or declined call (contacts only
+  by default, Cambodian mobiles only, once per 30 min, never to spam).
+
+**Notes & live text** (Settings → Notes & live text)
+- After-call card: add a note, send a message or block when a call ends.
+- Notes show in Recents and on the call card the next time that person calls.
+- Live text: captions during a call (Khmer or English) using Google speech
+  recognition, saved into the call note. Android doesn't give apps the call
+  audio, so it listens with the microphone: your voice, and the other side with
+  the speaker on. Some phones mute the mic for other apps during calls.
 
 ## Adding the real logos
 
@@ -39,8 +66,14 @@ release, get permission or keep the coloured badges.
 | File | Role |
 |------|------|
 | `carrier/CarrierLookup.kt` | Prefix table + number normalising (`+855…`, `00855…`, `0…`) |
-| `call/CallerIdScreeningService.kt` | Receives incoming calls, never blocks them |
-| `call/CallerOverlay.kt` | The floating card (drag up/down to move; position is remembered) |
+| `call/CallerIdScreeningService.kt` | Receives incoming calls, blocks the ones the spam rules flag |
+| `call/CallerOverlay.kt` | The floating card: ringing / in-call / after-call (drag up/down to move) |
+| `call/CallSession.kt` | Follows each call (ringing → answered → ended) for auto-reply and the after-call card |
+| `call/CallActions.kt` | SMS sending, declining calls, auto-reply |
+| `spam/SpamRules.kt` | Offline spam rules and block-list matching (unit-tested) |
+| `spam/BlockStore.kt` | Block list, spam reports, blocked-call log |
+| `notes/CallNotes.kt` | Call notes and live-text transcripts |
+| `ui/CallNoteActivity.kt`, `ui/LiveTextActivity.kt` | Panels that open over the call screen |
 | `call/CallWatcherService.kt` | Keeps the app alive while the card is visible |
 | `call/IncomingCallReceiver.kt` | Backup detector (system PHONE_STATE broadcast) so the card shows even if Android skips the screening service |
 | `ui/RecentsScreen.kt` | Call history with each caller's network |

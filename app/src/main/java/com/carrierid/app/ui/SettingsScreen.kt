@@ -26,6 +26,9 @@ import com.carrierid.app.call.CallerOverlay
 import com.carrierid.app.carrier.Carrier
 import com.carrierid.app.carrier.CarrierLogos
 import com.carrierid.app.carrier.CarrierLookup
+import com.carrierid.app.notes.CallNotes
+import com.carrierid.app.settings.Features
+import com.carrierid.app.spam.BlockStore
 import com.carrierid.app.ui.theme.One
 
 private data class SetupItem(
@@ -45,6 +48,7 @@ internal fun SettingsScreen(
     onRequestPerms: () -> Unit,
     onOpenBattery: () -> Unit,
     onPickLogo: (Carrier) -> Unit,
+    onOpenPage: (String) -> Unit,
 ) {
     val ctx = LocalContext.current
     val c = One.colors
@@ -77,6 +81,38 @@ internal fun SettingsScreen(
             GroupCell(i, items.size, onClick = it.onClick, dividerStart = Dimens.textStart(34.dp)) {
                 SettingContent(it.icon, it.color, it.title,
                     if (it.done) "On" else it.offText, it.done, it.onClick)
+            }
+        }
+
+        // ---- Features
+        item { GroupHeader("Features") }
+        item {
+            val v by Features.version
+            val nv by CallNotes.version
+            val blockedToday = remember(v) {
+                BlockStore.blockedLog.all(ctx).count { android.text.format.DateUtils.isToday(it.time) }
+            }
+            val rows = listOf(
+                Triple("spam", "Spam & blocking",
+                    if (blockedToday > 0) "$blockedToday blocked today" else "Warn about and block unwanted calls"),
+                Triple("messages", "Messages",
+                    if (Features.autoReply.get(ctx)) "Auto-reply on  ·  quick replies on the call card"
+                    else "Quick replies and auto-reply by SMS"),
+                Triple("notes", "Notes & live text",
+                    remember(nv) { CallNotes.all(ctx).size }.let { if (it > 0) "$it call notes" else "Call notes and live captions" }),
+            )
+            val looks = mapOf(
+                "spam" to (AppIcons.Shield to Color(0xFFE5484D)),
+                "messages" to (AppIcons.Message to Color(0xFF30B467)),
+                "notes" to (AppIcons.Note to Color(0xFFF2994A)),
+            )
+            Column {
+                rows.forEachIndexed { i, (id, title, sub) ->
+                    val (icon, color) = looks.getValue(id)
+                    GroupCell(i, rows.size, onClick = { onOpenPage(id) }, dividerStart = Dimens.textStart(34.dp)) {
+                        LinkContent(icon, color, title, sub)
+                    }
+                }
             }
         }
 

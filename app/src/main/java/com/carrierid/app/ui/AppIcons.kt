@@ -138,4 +138,48 @@ object AppIcons {
         "M6,6 L18,18" to false)
     }
 
+    val Back: ImageVector by lazy {
+        icon("back",
+        "M14.5,5.5 L8,12 L14.5,18.5" to false)
+    }
+
+    val Message: ImageVector by lazy {
+        icon("message",
+        "M5,5 H19 a1.5,1.5 0 0,1 1.5,1.5 V15 a1.5,1.5 0 0,1 -1.5,1.5 H10.5 L6.5,19.8 V16.5 H5 a1.5,1.5 0 0,1 -1.5,-1.5 V6.5 a1.5,1.5 0 0,1 1.5,-1.5 Z" to false)
+    }
+
+    val Note: ImageVector by lazy {
+        icon("note",
+        "M6.5,3.5 H14 L18.5,8 V19 a1.5,1.5 0 0,1 -1.5,1.5 H6.5 a1.5,1.5 0 0,1 -1.5,-1.5 V5 a1.5,1.5 0 0,1 1.5,-1.5 Z" to false,
+        "M14,3.5 V8 H18.5" to false,
+        "M8.5,12.5 H15 M8.5,16 H13" to false)
+    }
+
+    val Mic: ImageVector by lazy {
+        icon("mic",
+        "M12,3.5 a2.8,2.8 0 0,1 2.8,2.8 V11.5 a2.8,2.8 0 0,1 -5.6,0 V6.3 a2.8,2.8 0 0,1 2.8,-2.8 Z" to false,
+        "M6.5,11 a5.5,5.5 0 0,0 11,0" to false,
+        "M12,16.5 V20.5" to false)
+    }
+
+    val Warning: ImageVector by lazy {
+        icon("warning",
+        "M12,4 L21,19.5 H3 Z" to false,
+        "M12,10 V13.8" to false,
+        "M12,16.7 V16.8" to false)
+    }
+
+    val Globe: ImageVector by lazy {
+        icon("globe",
+        "M12,3.5 a8.5,8.5 0 1,0 0.001,0 Z" to false,
+        "M3.5,12 H20.5" to false,
+        "M12,3.5 C9.3,6.3 9.3,17.7 12,20.5 C14.7,17.7 14.7,6.3 12,3.5 Z" to false)
+    }
+
+    val Bell: ImageVector by lazy {
+        icon("bell",
+        "M6.5,16.5 V11 a5.5,5.5 0 0,1 11,0 V16.5 L19,18 H5 Z" to false,
+        "M10,20.5 H14" to false)
+    }
+
 }

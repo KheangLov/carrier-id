@@ -12,6 +12,7 @@ import android.os.PowerManager
 import android.provider.ContactsContract
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.PickVisualMediaRequest
@@ -64,6 +65,9 @@ class MainActivity : ComponentActivity() {
     private val permsLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { resumeTick++ }
 
+    /** Settings sub-page to open (from a notification), e.g. "spam". */
+    private var openPage by mutableStateOf<String?>(null)
+
     /** Carrier whose logo the user is picking right now. */
     private var pickingLogoFor: Carrier? = null
     private val logoPicker =
@@ -90,9 +94,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val startOnContacts = holdsScreeningRole() && has(Manifest.permission.READ_CONTACTS)
+        openPage = intent?.getStringExtra(EXTRA_PAGE)
         setContent {
             OneUiTheme {
                 var tab by rememberSaveable { mutableIntStateOf(if (startOnContacts) 0 else 2) }
+                var page by rememberSaveable { mutableStateOf<String?>(null) }
+                LaunchedEffect(openPage) {
+                    openPage?.let { tab = 2; page = it; openPage = null }
+                }
+                BackHandler(enabled = tab == 2 && page != null) { page = null }
                 GlassScaffold(
                     selected = tab,
                     tabs = listOf(
@@ -100,25 +110,49 @@ class MainActivity : ComponentActivity() {
                         TabItem("Contacts", AppIcons.Person, AppIcons.PersonFilled),
                         TabItem("Settings", AppIcons.Sliders, AppIcons.SlidersFilled),
                     ),
-                    onSelect = { tab = it },
+                    onSelect = { if (it == tab) page = null; tab = it },
                 ) {
                     Box(Modifier.fillMaxSize().background(One.colors.background)) {
                         when (tab) {
                             0 -> RecentsScreen(resumeTick, ::requestRuntimePerms)
                             1 -> ContactsScreen(resumeTick, ::requestRuntimePerms)
-                            else -> SettingsScreen(
-                                tick = resumeTick,
-                                onRequestRole = ::requestScreeningRole,
-                                onRequestOverlay = ::openOverlaySettings,
-                                onRequestPerms = ::requestRuntimePerms,
-                                onOpenBattery = ::openBatterySettings,
-                                onPickLogo = ::pickLogo,
-                            )
+                            else -> when (page) {
+                                "spam" -> SpamScreen(resumeTick, { page = null }, ::requestScreeningRole)
+                                "messages" -> MessagesScreen(resumeTick, { page = null }, ::requestPerms)
+                                "notes" -> NotesScreen(resumeTick, { page = null }, ::requestPerms)
+                                else -> SettingsScreen(
+                                    tick = resumeTick,
+                                    onRequestRole = ::requestScreeningRole,
+                                    onRequestOverlay = ::openOverlaySettings,
+                                    onRequestPerms = ::requestRuntimePerms,
+                                    onOpenBattery = ::openBatterySettings,
+                                    onPickLogo = ::pickLogo,
+                                    onOpenPage = { page = it },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.getStringExtra(EXTRA_PAGE)?.let { openPage = it }
+    }
+
+    /** Asks for specific permissions; opens App info if Android won't ask again. */
+    private fun requestPerms(perms: Array<String>) {
+        if (perms.all { has(it) }) {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
+        } else {
+            permsLauncher.launch(perms)
+        }
+    }
+
+    companion object {
+        const val EXTRA_PAGE = "page"
     }
 
     override fun onResume() {

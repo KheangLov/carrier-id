@@ -5,31 +5,47 @@ import android.content.Context
 import android.content.Intent
 import android.telephony.TelephonyManager
 import com.carrierid.app.carrier.CarrierLookup
+import com.carrierid.app.spam.SpamCheck
+import com.carrierid.app.spam.Verdict
 
 /**
- * Backup path for showing the call card.
+ * Follows the phone's call state (system PHONE_STATE broadcast).
  *
- * The call-screening service is the main path, but on some phones/One UI
- * versions Android skips it (e.g. for some saved contacts). The system's
- * PHONE_STATE broadcast carries the caller's number when the app has the
- * call-log permission, so we use it as a second source. CallerOverlay ignores
- * the duplicate when both fire for the same call.
+ *  - Backup path for showing the call card: on some phones/One UI versions
+ *    Android skips the screening service (e.g. for some saved contacts).
+ *    CallerOverlay ignores the duplicate when both fire for the same call.
+ *  - Drives [CallSession]: in-call card, after-call card, auto-reply.
  */
 class IncomingCallReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
+        val app = context.applicationContext
 
         when (intent.getStringExtra(TelephonyManager.EXTRA_STATE)) {
             TelephonyManager.EXTRA_STATE_RINGING -> {
                 // Android sends this broadcast twice; only one copy has the number.
                 @Suppress("DEPRECATION")
                 val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
+                CallSession.onRinging(app, number)
                 if (!number.isNullOrBlank()) {
-                    CallerOverlay.show(context, number, CarrierLookup.lookup(number))
+                    val pending = goAsync()
+                    Thread {
+                        try {
+                            val verdict = runCatching { SpamCheck.check(app, number) }
+                                .getOrDefault(Verdict.SAFE)
+                            CallerOverlay.show(app, number, CarrierLookup.lookup(number), verdict)
+                        } finally {
+                            pending.finish()
+                        }
+                    }.start()
                 }
             }
-            TelephonyManager.EXTRA_STATE_IDLE -> CallerOverlay.onCallEnded()
+            TelephonyManager.EXTRA_STATE_OFFHOOK -> CallSession.onOffhook(app)
+            TelephonyManager.EXTRA_STATE_IDLE -> {
+                CallerOverlay.onCallEnded()
+                CallSession.onIdle(app)
+            }
         }
     }
 }

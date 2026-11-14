@@ -15,6 +15,22 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Quick replies on the call card + auto-reply to missed calls -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- Decline the ringing call after a quick reply or "Block" on the call card -->
+    <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" />
+    <!-- Live text (speech-to-text captions) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!-- Android 11+ package visibility: find the phone's speech recognition service -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -26,12 +42,29 @@
 
         <activity
             android:name=".ui.MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Panels that open over the call screen -->
+        <activity
+            android:name=".ui.CallNoteActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.CarrierID.Panel"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".ui.LiveTextActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:showWhenLocked="true"
+            android:theme="@style/Theme.CarrierID.Panel" />
 
         <!-- Android calls this for every incoming call once the user grants
              the "Caller ID & spam" (call screening) role to this app. -->

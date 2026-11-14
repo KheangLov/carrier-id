@@ -75,6 +75,7 @@ fun LargeTitleScreen(
     title: String,
     subtitle: String?,
     listState: LazyListState = rememberLazyListState(),
+    onBack: (() -> Unit)? = null,
     content: LazyListScope.() -> Unit,
 ) {
     val c = One.colors
@@ -140,11 +141,20 @@ fun LargeTitleScreen(
                     ))
                     .statusBarsPadding()
                     .height(64.dp)
-                    .padding(start = 24.dp, end = 24.dp, bottom = 8.dp),
+                    .padding(start = if (onBack != null) 64.dp else 24.dp, end = 24.dp, bottom = 8.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
-                Text(title, color = c.text, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+                Text(title, color = c.text, fontSize = 19.sp, fontWeight = FontWeight.SemiBold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+        }
+
+        if (onBack != null) {
+            Box(
+                Modifier.statusBarsPadding().padding(start = 10.dp, top = 8.dp)
+                    .size(44.dp).clip(CircleShape).clickable(onClick = onBack),
+                contentAlignment = Alignment.Center,
+            ) { Icon(AppIcons.Back, "Back", tint = c.text, modifier = Modifier.size(24.dp)) }
         }
     }
 }
